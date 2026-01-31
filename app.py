@@ -1,6 +1,5 @@
 import streamlit as st
 import time
-import os
 from gemini_client import GeminiClient
 from youtube_handler import YouTubeHandler
 from pdf_handler import PDFHandler
@@ -14,93 +13,45 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# --- 2. 究極のUIデザイン & 漆黒アニメーション ---
+# --- 2. CSSデザイン ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@800&family=Inter:wght@400;600&display=swap');
 
-    /* ダークテーマの徹底 */
     .stApp { background-color: #05050a; color: #ffffff; }
 
-    /* すりガラス & ハプティック・ボタン */
+    .summary-container {
+        font-size: 1.05rem; line-height: 1.8; color: #e0e0e0;
+        background: rgba(255,255,255,0.03); padding: 20px;
+        border-radius: 18px; border-left: 4px solid #00f2fe;
+        margin-bottom: 20px; white-space: pre-wrap;
+    }
+
+    /* ライブラリカードのデザイン */
+    .kb-card {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 15px; padding: 15px;
+        margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1);
+        transition: 0.3s;
+    }
+    .kb-card:hover { border-color: #00f2fe; background: rgba(0, 242, 254, 0.05); }
+
     .stButton>button {
         background: linear-gradient(135deg, rgba(102, 126, 234, 0.7), rgba(118, 75, 162, 0.7)) !important;
-        backdrop-filter: blur(12px);
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.15) !important;
-        border-radius: 16px !important;
-        padding: 0.8rem 1.5rem !important;
-        font-weight: 600 !important;
-        width: 100% !important;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-    .stButton>button:active {
-        transform: scale(0.96) !important;
-        filter: brightness(1.3);
-    }
-
-    /* スケルトン・ローディング */
-    @keyframes pulse {
-        0% { background-color: rgba(255,255,255,0.03); }
-        50% { background-color: rgba(255,255,255,0.08); }
-        100% { background-color: rgba(255,255,255,0.03); }
-    }
-    .loading-skeleton {
-        height: 24px;
+        backdrop-filter: blur(12px); color: white !important;
+        border-radius: 16px !important; transition: all 0.2s !important;
         width: 100%;
-        border-radius: 12px;
-        animation: pulse 1.5s infinite ease-in-out;
-        margin-bottom: 12px;
     }
+    .stButton>button:active { transform: scale(0.96) !important; }
 
-    /* ソースカード（すりガラス） */
-    .source-card {
-        background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(20px);
-        border-radius: 24px;
-        padding: 1.8rem;
-        margin-bottom: 1.2rem;
-        border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    }
-    .source-card h3 { color: #00f2fe !important; margin:0; font-size: 1.4rem; }
-    .source-card p { color: #aaa !important; font-size: 0.9rem; margin-top: 5px; }
-
-    /* 漆黒オープニング */
     .opening-container {
-        position: fixed;
-        top: 0; left: 0; width: 100vw; height: 100vh;
-        background: #000;
-        display: flex; align-items: center; justify-content: center;
-        z-index: 9999;
-        animation: fadeout 0.8s forwards 2.2s;
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: #000; display: flex; align-items: center; justify-content: center;
+        z-index: 9999; animation: fadeout 0.8s forwards 2.2s;
     }
     @keyframes fadeout { to { opacity: 0; visibility: hidden; } }
-    
-    .opening-title {
-        font-family: 'Exo 2', sans-serif;
-        font-size: clamp(2.5rem, 12vw, 5.5rem);
-        color: #fff;
-        font-weight: 800;
-        letter-spacing: 0.2em;
-        text-shadow: 0 0 30px rgba(0,242,254,0.8);
-        text-align: center;
-    }
-
-    /* メインコンテンツ幅制限 */
-    .main-wrapper { max-width: 750px; margin: 0 auto; padding: 20px; padding-bottom: 120px; }
-
-    /* タイピングエフェクト用 */
-    .typing-box {
-        font-size: 1.1rem;
-        line-height: 1.7;
-        color: #e0e0e0;
-        background: rgba(255,255,255,0.02);
-        padding: 20px;
-        border-radius: 15px;
-        border-left: 3px solid #667eea;
-    }
+    .opening-title { font-family: 'Exo 2'; font-size: clamp(2.5rem, 12vw, 5.5rem); color: #fff; text-shadow: 0 0 30px #00f2fe; }
+    .main-wrapper { max-width: 700px; margin: 0 auto; padding: 20px; padding-bottom: 120px; }
 </style>
 
 <div class="opening-container">
@@ -108,105 +59,114 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# --- 3. AIタイピングエフェクト ---
-def type_text(text):
+def type_summary(text):
     if not text: return
     placeholder = st.empty()
     full_response = ""
     for char in text:
         full_response += char
-        placeholder.markdown(f'<div class="typing-box">{full_response}▌</div>', unsafe_allow_html=True)
-        time.sleep(0.008) # 3-Flashの速さに合わせた超高速表示
-    placeholder.markdown(f'<div class="typing-box">{full_response}</div>', unsafe_allow_html=True)
+        placeholder.markdown(f'<div class="summary-container">{full_response}▌</div>', unsafe_allow_html=True)
+        time.sleep(0.005)
+    placeholder.markdown(f'<div class="summary-container">{full_response}</div>', unsafe_allow_html=True)
 
 def main():
     if 'page' not in st.session_state: st.session_state.page = "home"
     if 'current_text' not in st.session_state: st.session_state.current_text = None
+    if 'current_title' not in st.session_state: st.session_state.current_title = ""
     
-    client = GeminiClient() # ここで gemini-3-flash-preview が初期化される
-    
+    client = GeminiClient()
+    db = Database()
     st.markdown('<div class="main-wrapper">', unsafe_allow_html=True)
 
+    # --- HOME PAGE ---
     if st.session_state.page == "home":
-        st.markdown('<div style="text-align:center; padding: 30px 0;"><h1 style="font-family:\'Exo 2\'; font-size:clamp(2rem, 8vw, 3.5rem); margin:0; background: linear-gradient(to right, #00f2fe, #fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">DEEP LEARN</h1><p style="color:#667; letter-spacing: 2px;">POWERED BY GEMINI 3 FLASH</p></div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align:center; padding: 30px 0;"><h1 style="font-family:\'Exo 2\'; font-size:3rem; margin:0; background: linear-gradient(to right, #00f2fe, #fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">DEEP LEARN</h1></div>', unsafe_allow_html=True)
         
-        # YouTubeセクション
-        with st.container():
-            st.markdown('<div class="source-card"><h3>🎬 YouTube</h3><p>動画を瞬時にナレッジへ変換</p></div>', unsafe_allow_html=True)
-            url = st.text_input("URL", label_visibility="collapsed", placeholder="https://youtube.com/watch?v=...")
-            if st.button("🚀 解析を開始する"):
-                if url:
-                    with st.status("🧠 AI同期中...", expanded=True) as status:
-                        st.markdown('<div class="loading-skeleton"></div><div class="loading-skeleton" style="width:80%"></div>', unsafe_allow_html=True)
-                        try:
-                            res = YouTubeHandler().get_transcript_from_url(url)
-                            st.session_state.current_text = res['text']
-                            status.update(label="同期完了！", state="complete", expanded=False)
-                            st.session_state.page = "study"
-                            st.rerun()
-                        except Exception as e:
-                            status.update(label="エラー発生", state="error")
-                            st.error(f"動画の取得に失敗しました: {e}")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🚀 新しく学習する"):
+                st.session_state.input_mode = True
+        with col2:
+            if st.button("📂 ライブラリを見る"):
+                st.session_state.page = "library"
+                st.rerun()
 
-        # PDFセクション
-        with st.container():
-            st.markdown('<div class="source-card"><h3>📄 Document</h3><p>PDF資料から重要情報を抽出</p></div>', unsafe_allow_html=True)
-            file = st.file_uploader("Upload", type=['pdf'], label_visibility="collapsed")
-            if file and st.button("🚀 ファイルを読み込む"):
-                try:
-                    res = PDFHandler.extract_text_from_bytes(file.read())
-                    st.session_state.current_text = res['text']
+        if st.session_state.get('input_mode'):
+            st.markdown("---")
+            url = st.text_input("YouTube URL", placeholder="https://youtube.com/...")
+            if st.button("🎬 動画を解析"):
+                if url:
+                    with st.status("🧠 AI同期中..."):
+                        res = YouTubeHandler().get_transcript_from_url(url)
+                        st.session_state.current_text = res['text']
+                        st.session_state.current_title = "YouTube Content"
                     st.session_state.page = "study"
                     st.rerun()
-                except Exception as e:
-                    st.error(f"PDFの解析に失敗しました: {e}")
 
-        st.write("---")
-        if st.button("📂 保存済みライブラリ"):
-            st.session_state.page = "kb"
-            st.rerun()
-
+    # --- STUDY PAGE ---
     elif st.session_state.page == "study":
-        st.markdown('<h2 style="text-align:center; font-family:\'Exo 2\';">📖 Study Session</h2>', unsafe_allow_html=True)
-        if st.button("🏠 ホームへ戻る"):
-            st.session_state.page = "home"
-            st.rerun()
+        st.markdown(f'<h3 style="text-align:center;">📖 {st.session_state.current_title}</h3>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🏠 Home"):
+                st.session_state.page = "home"
+                st.rerun()
+        with col2:
+            if st.button("💾 この学習を保存"):
+                db.save_knowledge(st.session_state.current_title, st.session_state.current_text)
+                st.toast("ライブラリに保存しました！", icon="✅")
 
         tab1, tab2, tab3 = st.tabs(["✨ 要約", "🎯 ポイント", "❓ クイズ"])
         
         with tab1:
-            if st.button("⚡ 高精度要約を生成"):
-                with st.spinner("Gemini 3 Flash が思考中..."):
-                    res = client.summarize(st.session_state.current_text, '30min')
-                    type_text(res)
+            if st.button("⚡ 5分で読破する要約"):
+                res = client.summarize(st.session_state.current_text, '30min')
+                type_summary(res)
         
         with tab2:
-            if st.button("⚡ キーポイントを抽出"):
-                with st.spinner("分析中..."):
-                    res = client.extract_key_points(st.session_state.current_text)
-                    type_text(res)
+            if st.button("⚡ 重要語句を抽出"):
+                res = client.extract_key_points(st.session_state.current_text)
+                type_summary(res)
         
         with tab3:
-            if st.button("⚡ クイズを自動生成"):
-                with st.spinner("問題を作成中..."):
-                    res = client.generate_quiz(st.session_state.current_text)
-                    type_text(res)
+            if st.button("⚡ クイズを生成"):
+                with st.spinner("思考中..."):
+                    quiz_data = client.generate_quiz(st.session_state.current_text)
+                    st.session_state.last_quiz = quiz_data
+            if 'last_quiz' in st.session_state:
+                st.markdown(f'<div class="summary-container">{st.session_state.last_quiz}</div>', unsafe_allow_html=True)
+                with st.expander("👁️ 正解・解説を確認する"):
+                    st.info("回答は上記テキスト内に含まれています。")
 
-    elif st.session_state.page == "kb":
-        st.title("📂 Library")
-        if st.button("🏠 戻る"):
+    # --- LIBRARY PAGE (振り返り) ---
+    elif st.session_state.page == "library":
+        st.markdown('<h2 style="text-align:center;">📂 ライブラリ</h2>', unsafe_allow_html=True)
+        if st.button("🏠 Homeへ戻る"):
             st.session_state.page = "home"
             st.rerun()
-        # データベース読み出しロジック（Databaseクラスの実装に依存）
-        db = Database()
+        
         items = db.get_all_knowledge()
         if not items:
-            st.info("保存されたナレッジはありません。")
+            st.info("まだ保存されたナレッジがありません。")
+        
         for item in items:
-            with st.expander(item['title']):
-                if st.button("この学習を再開", key=item['id']):
+            with st.container():
+                st.markdown(f"""
+                <div class="kb-card">
+                    <small style="color:#00f2fe;">{item['created_at']}</small>
+                    <h4 style="margin:5px 0;">{item['title']}</h4>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c1, c2 = st.columns(2)
+                if c1.button("🧠 復習する", key=f"rev_{item['id']}"):
                     st.session_state.current_text = item['original_text']
+                    st.session_state.current_title = item['title']
                     st.session_state.page = "study"
+                    st.rerun()
+                if c2.button("🗑️ 削除", key=f"del_{item['id']}"):
+                    db.delete_knowledge(item['id'])
                     st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
