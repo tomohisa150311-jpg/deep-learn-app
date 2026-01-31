@@ -1,6 +1,7 @@
 """DeepLearn - 学習支援アプリ メインUI"""
 import streamlit as st
 import urllib.parse
+import time
 from gemini_client import GeminiClient
 from youtube_handler import YouTubeHandler
 from pdf_handler import PDFHandler
@@ -14,323 +15,249 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# モダンなカスタムCSS & スマホ最適化
+# --- スタイリッシュUI & アニメーション設定 ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@700&family=Inter:wght@400;600&display=swap');
     
-    /* ベーススタイル */
-    .stApp {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-    
-    /* ヒーローセクション */
-    .hero-container {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 24px;
-        padding: 3rem 2rem;
-        margin-bottom: 2rem;
-        text-align: center;
-        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
-        animation: fadeInUp 0.8s ease-out;
-    }
-    
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(30px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .hero-icon {
-        font-size: 4rem;
-        margin-bottom: 1rem;
-        animation: float 3s ease-in-out infinite;
-    }
-    
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-    }
-    
-    .hero-title {
-        font-size: 3rem;
-        font-weight: 700;
-        color: white;
-        margin-bottom: 0.5rem;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    }
-    
-    .hero-subtitle {
-        font-size: 1.2rem;
-        color: rgba(255,255,255,0.9);
-        margin-bottom: 1.5rem;
-        font-weight: 300;
+    :root {
+        --primary: #667eea;
+        --secondary: #764ba2;
+        --accent: #00f2fe;
+        --bg-dark: #1a1a2e;
+        --text-main: #2d3436;
     }
 
-    /* スマホ最適化 */
-    @media (max-width: 640px) {
-        .hero-title { font-size: 2.2rem !important; }
-        .hero-subtitle { font-size: 1rem !important; }
-        .hero-stats { flex-direction: column; gap: 1rem !important; }
+    /* 全体背景 */
+    .stApp {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8f9fd;
+    }
+
+    /* --- 起動時派手なアニメーション --- */
+    @keyframes splash {
+        0% { transform: scale(0.8); opacity: 0; filter: blur(10px); }
+        50% { transform: scale(1.05); opacity: 1; filter: blur(0px); }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    
+    @keyframes glow {
+        0%, 100% { text-shadow: 0 0 10px #fff, 0 0 20px var(--accent); }
+        50% { text-shadow: 0 0 20px #fff, 0 0 40px var(--accent); }
+    }
+
+    .hero-container {
+        background: linear-gradient(135deg, var(--bg-dark) 0%, var(--secondary) 100%);
+        border-radius: 30px;
+        padding: 5rem 2rem;
+        margin-bottom: 2rem;
+        text-align: center;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+        animation: splash 1.2s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero-icon {
+        font-size: 5rem;
+        margin-bottom: 1rem;
+        display: inline-block;
+        filter: drop-shadow(0 0 15px var(--accent));
+    }
+
+    .hero-title {
+        font-family: 'Exo 2', sans-serif;
+        font-size: 4.5rem;
+        background: linear-gradient(to right, #fff, var(--accent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: glow 3s infinite;
+        margin: 0;
+    }
+
+    /* --- 視認性改善（白ボタン対策） --- */
+    .stButton>button {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 0.6rem 1.2rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+        width: 100%;
+    }
+
+    .stButton>button:hover {
+        transform: translateY(-2px) scale(1.02) !important;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5) !important;
+    }
+
+    /* --- スマホ最適化（サイドバー＆レイアウト） --- */
+    @media (max-width: 768px) {
+        .hero-title { font-size: 2.5rem !important; }
+        .hero-container { padding: 3rem 1rem !important; }
+        
+        /* スマホ時にサイドバー内の要素を大きく */
+        section[data-testid="stSidebar"] {
+            width: 80vw !important;
+        }
+        .stSelectbox, .stTextInput, .stTextArea {
+            margin-bottom: 1.5rem !important;
+        }
+        
+        /* カードのスタック */
         .feature-grid { grid-template-columns: 1fr !important; }
-        .stButton>button { width: 100% !important; height: 3.5rem !important; font-size: 1.1rem !important; }
     }
-    
-    .hero-stats {
-        display: flex;
-        justify-content: center;
-        gap: 3rem;
-        margin-top: 2rem;
-    }
-    
-    .stat-item { text-align: center; }
-    .stat-number { font-size: 2rem; font-weight: 700; color: white; }
-    .stat-label { font-size: 0.9rem; color: rgba(255,255,255,0.8); }
-    
+
     /* フィーチャーカード */
     .feature-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 1.5rem;
-        margin: 2rem 0;
+        margin-top: 2rem;
     }
     
     .feature-card {
         background: white;
-        border-radius: 16px;
-        padding: 1.5rem;
+        border-radius: 20px;
+        padding: 2rem;
         text-align: center;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        transition: all 0.3s ease;
-        border: 1px solid #f0f0f0;
+        border: 1px solid #eee;
+        transition: 0.3s;
     }
-    
     .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 40px rgba(102, 126, 234, 0.15);
-    }
-
-    /* サイドバーボタン */
-    section[data-testid="stSidebar"] .stButton button {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 500;
+        border-color: var(--primary);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.05);
     }
 </style>
 """, unsafe_allow_html=True)
 
-
 def init_session_state():
-    """セッション状態の初期化"""
+    if 'initialized' not in st.session_state:
+        st.session_state.initialized = True
+        # 起動時の演出時間
+        # time.sleep(0.5) 
+    
     defaults = {
-        'current_text': None,
-        'current_title': None,
-        'current_source_type': None,
-        'current_source_url': None,
-        'summaries': {},
-        'key_points': None,
-        'quiz': None,
-        'teach_explanation': None,
-        'view_mode': None,
+        'current_text': None, 'current_title': None,
+        'current_source_type': None, 'current_source_url': None,
+        'summaries': {}, 'key_points': None, 'quiz': None, 'view_mode': None
     }
     for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
-
+        if key not in st.session_state: st.session_state[key] = value
 
 def get_gemini_client():
-    """Geminiクライアントを取得"""
     if 'gemini_client' not in st.session_state:
-        try:
-            st.session_state.gemini_client = GeminiClient()
-        except ValueError as e:
-            st.error(str(e))
-            st.stop()
+        st.session_state.gemini_client = GeminiClient()
     return st.session_state.gemini_client
 
-
-def get_database():
-    """データベースを取得"""
-    if 'database' not in st.session_state:
-        st.session_state.database = Database()
-    return st.session_state.database
-
-
-def render_share_buttons(title: str, text: str):
-    """共有ボタンを描画"""
-    share_text = f"📚 {title}\n\n{text[:200]}...\n\n#DeepLearn で学習中！"
-    encoded_text = urllib.parse.quote(share_text)
-    
-    twitter_url = f"https://twitter.com/intent/tweet?text={encoded_text}"
-    line_url = f"https://social-plugins.line.me/lineit/share?url=&text={encoded_text}"
-    
-    st.markdown(f"""
-    <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <a href="{twitter_url}" target="_blank" style="background:#1DA1F2; color:white; padding:10px 20px; border-radius:50px; text-decoration:none;">🐦 Twitter</a>
-        <a href="{line_url}" target="_blank" style="background:#00B900; color:white; padding:10px 20px; border-radius:50px; text-decoration:none;">💬 LINE</a>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if st.button("📋 クリップボードにコピー", key=f"copy_{hash(text[:50])}"):
-        st.code(share_text, language=None)
-        st.success("コピーしてください！")
-
-
 def sidebar():
-    """サイドバーの描画"""
     with st.sidebar:
-        st.markdown("## 🧠 DeepLearn")
-        st.markdown("---")
-        st.markdown("### 📥 コンテンツを追加")
+        st.markdown("<h1 style='color:white; font-family:Exo 2;'>🧠 DeepLearn</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='color:#aaa;'>Next-Gen Learning AI</p>", unsafe_allow_html=True)
+        st.write("---")
         
-        source_type = st.selectbox(
-            "種類を選択",
-            ["YouTube動画", "PDFファイル", "テキスト入力"],
-            key="source_type_select"
-        )
+        mode = st.radio("メニュー", ["ホーム", "ナレッジベース"], label_visibility="collapsed")
+        if mode == "ナレッジベース":
+            st.session_state.view_mode = "knowledge_base"
+        else:
+            st.session_state.view_mode = None
+
+        st.markdown("### 📥 追加")
+        source_type = st.selectbox("ソース", ["YouTube", "PDF", "Text"])
         
-        if source_type == "YouTube動画":
-            youtube_url = st.text_input("YouTube URL", key="youtube_url")
-            if st.button("🎬 動画を読み込む", use_container_width=True):
-                if youtube_url:
-                    with st.spinner("取得中..."):
-                        try:
-                            handler = YouTubeHandler()
-                            result = handler.get_transcript_from_url(youtube_url)
-                            st.session_state.current_text = result['text']
-                            st.session_state.current_title = "YouTube動画"
-                            st.session_state.current_source_type = "youtube"
-                            st.session_state.current_source_url = youtube_url
-                            st.session_state.summaries = {}
-                            st.rerun()
-                        except Exception as e:
-                            st.error(str(e))
-        
-        elif source_type == "PDFファイル":
-            uploaded_file = st.file_uploader("PDFを選択", type=['pdf'])
-            if uploaded_file and st.button("📄 読み込む", use_container_width=True):
-                with st.spinner("解析中..."):
-                    result = PDFHandler.extract_text_from_bytes(uploaded_file.read())
-                    st.session_state.current_text = result['text']
-                    st.session_state.current_title = uploaded_file.name
-                    st.session_state.current_source_type = "pdf"
+        if source_type == "YouTube":
+            url = st.text_input("URLを入力")
+            if st.button("🚀 読み込む") and url:
+                with st.spinner("Analyzing..."):
+                    res = YouTubeHandler().get_transcript_from_url(url)
+                    st.session_state.current_text = res['text']
+                    st.session_state.current_title = "YouTube Video"
                     st.session_state.summaries = {}
                     st.rerun()
         
+        elif source_type == "PDF":
+            file = st.file_uploader("ファイルをアップロード")
+            if file and st.button("🚀 解析開始"):
+                res = PDFHandler.extract_text_from_bytes(file.read())
+                st.session_state.current_text = res['text']
+                st.session_state.current_title = file.name
+                st.session_state.summaries = {}
+                st.rerun()
+        
         else:
-            t_title = st.text_input("タイトル")
-            t_content = st.text_area("テキスト")
-            if st.button("📝 読み込む", use_container_width=True):
-                st.session_state.current_text = t_content
-                st.session_state.current_title = t_title or "テキスト"
-                st.session_state.current_source_type = "text"
+            txt = st.text_area("テキストを入力")
+            if st.button("🚀 学習開始") and txt:
+                st.session_state.current_text = txt
+                st.session_state.current_title = "Input Text"
                 st.rerun()
 
-        st.markdown("---")
-        if st.button("📂 ナレッジベース", use_container_width=True):
-            st.session_state.view_mode = "knowledge_base"
-            st.rerun()
-
-
 def render_landing():
-    """ランディングページを描画"""
     st.markdown("""
     <div class="hero-container">
-        <div class="hero-icon">🧠</div>
-        <h1 class="hero-title">DeepLearn</h1>
-        <p class="hero-subtitle">本や動画の内容を深く理解し、人に教えられるレベルまで</p>
-        <div class="hero-stats">
-            <div class="stat-item"><div class="stat-number">3段階</div><div class="stat-label">要約</div></div>
-            <div class="stat-item"><div class="stat-number">AI</div><div class="stat-label">Gemini</div></div>
-            <div class="stat-item"><div class="stat-number">∞</div><div class="stat-label">保存</div></div>
-        </div>
+        <div class="hero-icon">💎</div>
+        <h1 class="hero-title">DEEP LEARN</h1>
+        <p class="hero-subtitle">AIがあなたの学習を劇的に効率化する</p>
     </div>
     <div class="feature-grid">
-        <div class="feature-card"><h3>🎬 YouTube</h3><p>URLで要約</p></div>
-        <div class="feature-card"><h3>📄 PDF</h3><p>文書を解析</p></div>
-        <div class="feature-card"><h3>✍️ Text</h3><p>メモを学習</p></div>
+        <div class="feature-card"><h2>🎬</h2><b>YouTube</b><p>動画を瞬時に要約</p></div>
+        <div class="feature-card"><h2>📄</h2><b>Document</b><p>PDFから重要点を抽出</p></div>
+        <div class="feature-card"><h2>⚡</h2><b>Teaching</b><p>教えるモードで定着</p></div>
     </div>
     """, unsafe_allow_html=True)
 
-
 def main_content():
-    """メインコンテンツの描画"""
-    if st.session_state.get('view_mode') == 'knowledge_base':
-        show_knowledge_base()
+    if st.session_state.view_mode == "knowledge_base":
+        st.title("📂 Knowledge Base")
+        if st.button("← 戻る"):
+            st.session_state.view_mode = None
+            st.rerun()
+        db = Database()
+        for item in db.get_all_knowledge():
+            with st.expander(item['title']):
+                st.write(item['created_at'])
+                if st.button("再開", key=item['id']):
+                    st.session_state.current_text = item['original_text']
+                    st.session_state.view_mode = None
+                    st.rerun()
         return
-    
+
     if st.session_state.current_text is None:
         render_landing()
         return
-    
+
     st.title(f"📖 {st.session_state.current_title}")
-    
-    tab1, tab2, tab3, tab4 = st.tabs(["📝 要約", "🎯 ポイント", "❓ クイズ", "💾 保存"])
-    gemini = get_gemini_client()
-    
-    with tab1:
-        col1, col2, col3 = st.columns(3)
-        for i, (lvl, label) in enumerate([('10min', '10分'), ('30min', '30分'), ('1hour', '1時間')]):
-            if col1 if i==0 else col2 if i==1 else col3:
-                if st.button(f"⚡ {label}要約", use_container_width=True):
-                    with st.spinner("生成中..."):
-                        st.session_state.summaries[lvl] = gemini.summarize(st.session_state.current_text, lvl)
+    tabs = st.tabs(["📝 要約", "🎯 ポイント", "❓ クイズ", "💾 保存"])
+    client = get_gemini_client()
+
+    with tabs[0]:
+        cols = st.columns(3)
+        lvls = [('10min', 'クイック'), ('30min', '標準'), ('1hour', '詳細')]
+        for i, (k, l) in enumerate(lvls):
+            if cols[i].button(f"⚡ {l}"):
+                with st.spinner("AI Generating..."):
+                    st.session_state.summaries[k] = client.summarize(st.session_state.current_text, k)
         
-        for lvl in st.session_state.summaries:
-            st.markdown(f"### {lvl} 要約")
-            st.write(st.session_state.summaries[lvl])
-            render_share_buttons(st.session_state.current_title, st.session_state.summaries[lvl])
+        for k in st.session_state.summaries:
+            st.markdown(f"--- \n ### {k} Summary")
+            st.write(st.session_state.summaries[k])
 
-    with tab2:
-        if st.button("ポイント抽出"):
-            st.session_state.key_points = gemini.extract_key_points(st.session_state.current_text)
-        if st.session_state.key_points:
-            st.write(st.session_state.key_points)
+    with tabs[1]:
+        if st.button("ポイントを抽出"):
+            st.session_state.key_points = client.extract_key_points(st.session_state.current_text)
+        if st.session_state.key_points: st.write(st.session_state.key_points)
 
-    with tab3:
+    with tabs[2]:
         if st.button("クイズ作成"):
-            st.session_state.quiz = gemini.generate_quiz(st.session_state.current_text, 5)
-        if st.session_state.quiz:
-            st.write(st.session_state.quiz)
+            st.session_state.quiz = client.generate_quiz(st.session_state.current_text, 5)
+        if st.session_state.quiz: st.write(st.session_state.quiz)
 
-    with tab4:
+    with tabs[3]:
         if st.button("ナレッジベースに保存"):
-            db = get_database()
-            db.save_knowledge(
-                title=st.session_state.current_title,
-                source_type=st.session_state.current_source_type,
-                source_url=st.session_state.current_source_url,
-                original_text=st.session_state.current_text,
-                summary_10min=st.session_state.summaries.get('10min'),
-                summary_30min=st.session_state.summaries.get('30min'),
-                summary_1hour=st.session_state.summaries.get('1hour'),
-                key_points=st.session_state.key_points,
-                quiz=st.session_state.quiz,
-                tags=[]
-            )
-            st.success("保存しました！")
+            Database().save_knowledge(title=st.session_state.current_title, original_text=st.session_state.current_text, summaries=st.session_state.summaries)
+            st.success("Saved!")
             st.balloons()
-
-
-def show_knowledge_base():
-    """ナレッジベース表示"""
-    st.header("📂 保存済みリスト")
-    if st.button("← 戻る"):
-        st.session_state.view_mode = None
-        st.rerun()
-    
-    db = get_database()
-    for item in db.get_all_knowledge():
-        with st.expander(item['title']):
-            st.write(f"タイプ: {item['source_type']}")
-            if st.button("この学習を再開", key=f"re_{item['id']}"):
-                st.session_state.current_text = item['original_text']
-                st.session_state.current_title = item['title']
-                st.session_state.view_mode = None
-                st.rerun()
-
 
 def main():
     init_session_state()
