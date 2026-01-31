@@ -16,7 +16,14 @@ st.set_page_config(
 
 # モダンなカスタムCSS
 st.markdown("""
-<style>
+    /* ↓ここにスマホ用を追記！ */
+    @media (max-width: 640px) {
+        .hero-title { font-size: 2.2rem !important; }
+        .stButton>button { width: 100% !important; }
+        /* ...などなど */
+    }
+    </style>
+""", unsafe_allow_html=True)<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
     /* ベーススタイル */
