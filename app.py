@@ -3,13 +3,12 @@ import time
 from datetime import datetime
 
 # --- 外部モジュール (ご環境に合わせて読み込み) ---
-# ※ gemini_client などのファイルが同じフォルダにある前提です
 from gemini_client import GeminiClient
 from youtube_handler import YouTubeHandler
 from pdf_handler import PDFHandler
 from database import Database
 
-# --- 1. ページ設定 (必ず最初に記述) ---
+# --- 1. ページ設定 ---
 st.set_page_config(
     page_title="DeepLearn | AI Learning Assistant",
     page_icon="💎",
@@ -17,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- 2. CSSデザイン (Glassmorphism & Animation & Splash) ---
+# --- 2. CSSデザイン ---
 st.markdown("""
 <style>
     /* Google Fonts */
@@ -38,13 +37,24 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* --- スプラッシュスクリーン (オープニング) --- */
+    /* 固定クレジット (右下に常時表示) */
+    .sticky-footer {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        font-family: 'Exo 2', sans-serif;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+        pointer-events: none; /* 下のボタンの邪魔をしない */
+    }
+
+    /* スプラッシュスクリーン */
     .splash-container {
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
         background-color: #000000;
         z-index: 99999;
         display: flex;
@@ -54,11 +64,7 @@ st.markdown("""
         color: white;
     }
     
-    .splash-logo {
-        font-size: 6rem;
-        animation: pulseLogo 2s infinite ease-in-out;
-    }
-    
+    .splash-logo { font-size: 6rem; animation: pulseLogo 2s infinite ease-in-out; }
     .splash-text {
         font-family: 'Exo 2', sans-serif;
         font-size: 2.5rem;
@@ -68,17 +74,6 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         opacity: 0;
         animation: fadeInUp 1s ease-out forwards 0.5s;
-    }
-
-    .splash-credit {
-        position: absolute;
-        bottom: 50px;
-        font-family: 'Exo 2', sans-serif;
-        font-size: 1rem;
-        letter-spacing: 3px;
-        color: #666;
-        opacity: 0;
-        animation: fadeInUp 1s ease-out forwards 1.0s;
     }
 
     @keyframes pulseLogo {
@@ -92,27 +87,7 @@ st.markdown("""
         to { opacity: 1; transform: translateY(0); }
     }
 
-    /* タイトルスタイル */
-    .app-header {
-        text-align: center;
-        padding: 40px 0 20px 0;
-        font-family: 'Exo 2', sans-serif;
-        text-shadow: 0 0 20px rgba(0, 198, 255, 0.5);
-    }
-    .app-header h1 {
-        font-size: 3.5rem;
-        margin-bottom: 0;
-        background: linear-gradient(to right, #00c6ff, #0072ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .app-header p {
-        font-size: 1rem;
-        color: #aab;
-        letter-spacing: 2px;
-    }
-
-    /* ガラスパネル (共通カード) */
+    /* ガラスパネル */
     .glass-panel {
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(16px);
@@ -120,162 +95,70 @@ st.markdown("""
         border-radius: 20px;
         padding: 25px;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         margin-bottom: 20px;
-        transition: transform 0.3s ease;
-    }
-    .glass-panel:hover {
-        transform: translateY(-2px);
-        border-color: rgba(255, 255, 255, 0.2);
     }
 
-    /* 結果表示エリア */
-    .result-content {
-        line-height: 1.8;
-        font-size: 1.05rem;
-        white-space: pre-wrap;
+    .app-header { text-align: center; padding: 40px 0 20px 0; font-family: 'Exo 2', sans-serif; }
+    .app-header h1 {
+        font-size: 3.5rem;
+        background: linear-gradient(to right, #00c6ff, #0072ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
     
     /* ボタン */
     .stButton>button {
         border-radius: 12px !important;
         background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%) !important;
+        color: white !important;
         border: 1px solid rgba(255,255,255,0.2) !important;
-        color: white !important;
-        transition: all 0.3s !important;
-        font-weight: 600 !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
-    }
-    .stButton>button:hover {
-        background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%) !important;
-        border-color: #00c6ff !important;
-        transform: scale(1.02);
-        box-shadow: 0 0 15px rgba(0, 198, 255, 0.4) !important;
-    }
-
-    /* 入力フォーム */
-    .stTextInput>div>div>input {
-        background-color: rgba(0, 0, 0, 0.3) !important;
-        border-radius: 12px !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        color: white !important;
-        padding: 10px 15px !important;
-    }
-    .stTextInput>div>div>input:focus {
-        border-color: #00c6ff !important;
-        box-shadow: 0 0 10px rgba(0, 198, 255, 0.2) !important;
-    }
-    
-    /* ユーティリティ */
-    .badge-easy {
-        display: inline-block;
-        background: #00b09b;
-        color: white;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: bold;
-        margin-bottom: 10px;
-        box-shadow: 0 0 10px rgba(0, 176, 155, 0.4);
-    }
-    
-    /* クレジット footer */
-    .footer-credit {
-        text-align: center;
-        font-family: 'Exo 2', sans-serif;
-        color: rgba(255,255,255,0.3);
-        font-size: 0.8rem;
-        margin-top: 30px;
-        letter-spacing: 2px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. ヘルパー関数 ---
 def get_instruction_suffix(is_easy_mode):
     if is_easy_mode:
-        return """
-        \n【重要：出力スタイルについて】
-        ・デジタルに詳しくない人や、小学生でも理解できる言葉を使ってください。
-        ・専門用語は一切使わず、日常的な例え話に置き換えてください。
-        ・親しみやすいトーンで、絵文字（💎, ✨, 🚀など）を適度に使ってください。
-        ・箇条書きを活用して、視覚的にわかりやすくしてください。
-        """
+        return "\n【重要：出力スタイル】専門用語を使わず、小学生でもわかる例え話で解説してください。絵文字を多用してください。"
     return ""
 
 def main():
-    # --- Session State 初期化 ---
+    # Session State
     if 'page' not in st.session_state: st.session_state.page = "home"
     if 'current_text' not in st.session_state: st.session_state.current_text = None
     if 'active_tool' not in st.session_state: st.session_state.active_tool = None
     if 'result_cache' not in st.session_state: st.session_state.result_cache = None
-    if 'last_easy_mode' not in st.session_state: st.session_state.last_easy_mode = False
-    
-    # 履歴管理用のリスト
     if 'history_log' not in st.session_state: st.session_state.history_log = []
-    
-    # オープニングアニメーション制御フラグ
     if 'first_load' not in st.session_state: st.session_state.first_load = True
 
-    # --- オープニングアニメーション (初回のみ実行) ---
+    # スプラッシュ演出
     if st.session_state.first_load:
         placeholder = st.empty()
-        # HTML/CSSでフルスクリーンオーバーレイを描画
         placeholder.markdown("""
         <div class="splash-container">
             <div class="splash-logo">💎</div>
             <div class="splash-text">DeepLearn</div>
-            <div class="splash-credit">made in tomohisa</div>
+            <div style="margin-top:20px; color:#666; letter-spacing:3px;">made in tomohisa</div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # 疑似ロード時間 (2.5秒後にアプリ画面へ)
         time.sleep(2.5)
-        
-        # 状態更新 & リロード
         st.session_state.first_load = False
         placeholder.empty()
         st.rerun()
 
-    # --- インスタンス化 ---
-    try:
-        client = GeminiClient()
-        db = Database()
-    except Exception as e:
-        # モジュール読み込みエラー時のフォールバック
-        st.error(f"初期化エラー: {e}")
-        return
+    # インスタンス化
+    client = GeminiClient()
+    db = Database()
 
-    # --- サイドバー設定 ---
+    # サイドバー
     with st.sidebar:
         st.markdown("### ⚙️ 設定")
-        easy_mode = st.toggle("🔰 やさしいモード", value=False, help="ONにすると、専門用語を使わず、誰にでもわかる言葉で解説します。")
-        
-        if easy_mode != st.session_state.last_easy_mode:
-            st.session_state.result_cache = None
-            st.session_state.last_easy_mode = easy_mode
-            st.rerun()
-
+        easy_mode = st.toggle("🔰 やさしいモード", value=False)
         st.markdown("---")
         st.markdown("### 📚 最近の履歴")
-        
-        # セッション履歴の表示
-        if st.session_state.history_log:
-            for item in reversed(st.session_state.history_log):
-                with st.expander(f"📅 {item['time']}", expanded=False):
-                    st.caption(f"URL: {item['url']}")
-                    st.info("保存済み")
-        else:
-            st.caption("まだ履歴はありません")
+        for item in reversed(st.session_state.history_log):
+            st.caption(f"📅 {item['time']} - {item['url'][:25]}...")
 
-        # Tomohisa Credit (Sidebar Bottom)
-        st.markdown("""
-        <div class="footer-credit">
-            made in tomohisa
-        </div>
-        """, unsafe_allow_html=True)
-
-    # --- メインエリア ---
+    # メインヘッダー
     st.markdown("""
     <div class="app-header">
         <h1>💎 DeepLearn</h1>
@@ -287,114 +170,46 @@ def main():
     if st.session_state.page == "home":
         st.markdown('<div class="glass-panel" style="text-align:center;">', unsafe_allow_html=True)
         st.markdown("### 📺 動画で学びを始めよう")
-        st.markdown("YouTubeのURLを入力するだけで、AIが内容を瞬時に解析・要約します。")
-        
-        url = st.text_input("", placeholder="ここにYouTubeのURLをペーストしてください...", label_visibility="collapsed")
-        
-        col_c1, col_c2, col_c3 = st.columns([1, 2, 1])
-        with col_c2:
-            if st.button("🚀 解析をスタート", use_container_width=True):
-                if url:
-                    with st.spinner("🧠 AIが動画を視聴中... 文字起こしを取得しています"):
-                        progress_bar = st.progress(0)
-                        for i in range(100):
-                            time.sleep(0.01)
-                            progress_bar.progress(i + 1)
-                        
-                        try:
-                            # 実際の解析処理
-                            res = YouTubeHandler().get_transcript_from_url(url)
-                            st.session_state.current_text = res['text']
-                            
-                            # 履歴に追加
-                            timestamp = datetime.now().strftime("%H:%M")
-                            st.session_state.history_log.append({"url": url, "time": timestamp})
-                            
-                            st.session_state.page = "study"
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"エラーが発生しました: {e}")
-                else:
-                    st.warning("URLを入力してください")
+        url = st.text_input("", placeholder="YouTube URLをペースト...")
+        if st.button("🚀 解析をスタート", use_container_width=True):
+            if url:
+                with st.spinner("AIが解析中..."):
+                    res = YouTubeHandler().get_transcript_from_url(url)
+                    st.session_state.current_text = res['text']
+                    st.session_state.history_log.append({"url": url, "time": datetime.now().strftime("%H:%M")})
+                    st.session_state.page = "study"
+                    st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
     # --- STUDY PAGE ---
     elif st.session_state.page == "study":
-        
-        # ナビゲーションバー
-        c_nav1, c_nav2 = st.columns([1, 5])
-        with c_nav1:
-            if st.button("⬅️ TOP", use_container_width=True):
-                st.session_state.page = "home"
-                st.session_state.active_tool = None
-                st.session_state.result_cache = None
-                st.rerun()
-        
-        with c_nav2:
-            mode_badge = '<span class="badge-easy">🔰 やさしいモード ON</span>' if easy_mode else ""
-            st.markdown(f'<div style="text-align:right; padding-top:5px;">{mode_badge}</div>', unsafe_allow_html=True)
+        if st.button("⬅️ TOPに戻る"):
+            st.session_state.page = "home"
+            st.rerun()
 
-        # メインコントロール
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-        st.markdown("### 🛠️ 学習ツールを選択")
-        
-        c1, c2, c3, c4 = st.columns(4)
-        
-        def set_tool(tool_name):
-            st.session_state.active_tool = tool_name
-            st.session_state.result_cache = None
-
-        if c1.button("📝 要約する", use_container_width=True): set_tool("sum")
-        if c2.button("🎯 重要ポイント", use_container_width=True): set_tool("point")
-        if c3.button("❓ クイズ作成", use_container_width=True): set_tool("quiz")
-        if c4.button("💾 保存する", use_container_width=True):
-            # DBへの保存
-            db.save_knowledge("学習データ", st.session_state.current_text)
-            st.toast("✅ データベースに保存しました！", icon="💾")
-
+        c1, c2, c3 = st.columns(3)
+        if c1.button("📝 要約する"): st.session_state.active_tool, st.session_state.result_cache = "sum", None
+        if c2.button("🎯 ポイント"): st.session_state.active_tool, st.session_state.result_cache = "point", None
+        if c3.button("❓ クイズ作成"): st.session_state.active_tool, st.session_state.result_cache = "quiz", None
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # 結果表示
         if st.session_state.active_tool:
             if st.session_state.result_cache is None:
-                instruction = get_instruction_suffix(easy_mode)
-                
-                # 安全な文字列結合
-                if st.session_state.current_text:
-                    text_payload = st.session_state.current_text + instruction
-                else:
-                    text_payload = "テキストが見つかりません。"
-
-                with st.spinner("💎 Gemini 1.5 Flash が思考中..."):
+                payload = st.session_state.current_text + get_instruction_suffix(easy_mode)
+                with st.spinner("AI生成中..."):
                     try:
-                        if st.session_state.active_tool == "sum":
-                            st.session_state.result_cache = client.summarize(text_payload, '30min')
-                        elif st.session_state.active_tool == "point":
-                            st.session_state.result_cache = client.extract_key_points(text_payload)
-                        elif st.session_state.active_tool == "quiz":
-                            st.session_state.result_cache = client.generate_quiz(text_payload)
+                        if st.session_state.active_tool == "sum": st.session_state.result_cache = client.summarize(payload, '30min')
+                        elif st.session_state.active_tool == "point": st.session_state.result_cache = client.extract_key_points(payload)
+                        elif st.session_state.active_tool == "quiz": st.session_state.result_cache = client.generate_quiz(payload)
                     except Exception as e:
-                        st.error(f"AI生成エラー: {e}")
+                        st.error(f"エラー: {e}")
             
             if st.session_state.result_cache:
-                title_map = {"sum": "📝 要約結果", "point": "🎯 重要ポイント", "quiz": "❓ 理解度クイズ"}
-                current_title = title_map.get(st.session_state.active_tool, "結果")
-                
-                # HTMLを生成する際は改行に注意
-                result_html = f"""
-                <div class="glass-panel">
-                    <h3 style="border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px; margin-bottom:15px;">
-                        {current_title}
-                    </h3>
-                    <div class="result-content">
-                        {st.session_state.result_cache}
-                    </div>
-                </div>
-                """
-                st.markdown(result_html, unsafe_allow_html=True)
-                
-                with st.expander("📋 テキストをコピーする"):
-                    st.text_area("以下のテキストをコピーしてください", value=st.session_state.result_cache, height=100)
+                st.markdown(f'<div class="glass-panel"><h3>結果</h3><div>{st.session_state.result_cache}</div></div>', unsafe_allow_html=True)
+
+    # --- 端っこに常時表示するクレジット ---
+    st.markdown('<div class="sticky-footer">made in tomohisa</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
