@@ -13,45 +13,71 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# --- 2. CSSデザイン ---
+# --- 2. 究極のモバイルUXデザイン CSS ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@800&family=Inter:wght@400;600&display=swap');
 
     .stApp { background-color: #05050a; color: #ffffff; }
+    
+    /* コンテナの幅制限 */
+    .main-wrapper { max-width: 500px; margin: 0 auto; padding: 15px; }
 
-    .summary-container {
-        font-size: 1.05rem; line-height: 1.8; color: #e0e0e0;
-        background: rgba(255,255,255,0.03); padding: 20px;
-        border-radius: 18px; border-left: 4px solid #00f2fe;
-        margin-bottom: 20px; white-space: pre-wrap;
+    /* タイル型カードボタン */
+    .action-card {
+        background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 24px;
+        padding: 24px;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .action-card:active { transform: scale(0.98); background: rgba(255,255,255,0.08); }
+    .action-card h3 { margin: 0; font-size: 1.2rem; color: #00f2fe; display: flex; align-items: center; gap: 10px; }
+    .action-card p { margin: 8px 0 0 0; font-size: 0.9rem; color: #889; }
+
+    /* 要約表示エリア */
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        padding: 20px;
+        border: 1px solid rgba(255,255,255,0.08);
+        line-height: 1.8;
+        font-size: 1.05rem;
+        color: #e0e0e0;
+        margin-top: 15px;
+        white-space: pre-wrap;
     }
 
-    /* ライブラリカードのデザイン */
-    .kb-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 15px; padding: 15px;
-        margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1);
-        transition: 0.3s;
+    /* クイズ専用スタイル */
+    .quiz-box {
+        background: rgba(102, 126, 234, 0.05);
+        border-left: 4px solid #667eea;
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 15px;
     }
-    .kb-card:hover { border-color: #00f2fe; background: rgba(0, 242, 254, 0.05); }
 
+    /* Streamlit標準要素のオーバーライド */
     .stButton>button {
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.7), rgba(118, 75, 162, 0.7)) !important;
-        backdrop-filter: blur(12px); color: white !important;
-        border-radius: 16px !important; transition: all 0.2s !important;
-        width: 100%;
+        border-radius: 16px !important;
+        padding: 12px !important;
+        font-weight: 600 !important;
+        border: none !important;
     }
-    .stButton>button:active { transform: scale(0.96) !important; }
-
+    
+    /* 漆黒オープニング */
     .opening-container {
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
         background: #000; display: flex; align-items: center; justify-content: center;
-        z-index: 9999; animation: fadeout 0.8s forwards 2.2s;
+        z-index: 9999; animation: fadeout 0.8s forwards 1.5s;
     }
     @keyframes fadeout { to { opacity: 0; visibility: hidden; } }
-    .opening-title { font-family: 'Exo 2'; font-size: clamp(2.5rem, 12vw, 5.5rem); color: #fff; text-shadow: 0 0 30px #00f2fe; }
-    .main-wrapper { max-width: 700px; margin: 0 auto; padding: 20px; padding-bottom: 120px; }
+    .opening-title { font-family: 'Exo 2'; font-size: 3rem; color: #fff; text-shadow: 0 0 20px #00f2fe; letter-spacing: 5px; }
+
+    hr { opacity: 0.1; margin: 2rem 0; }
 </style>
 
 <div class="opening-container">
@@ -59,113 +85,143 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-def type_summary(text):
+def type_display(text, title="Result"):
     if not text: return
+    st.markdown(f"### {title}")
     placeholder = st.empty()
     full_response = ""
     for char in text:
         full_response += char
-        placeholder.markdown(f'<div class="summary-container">{full_response}▌</div>', unsafe_allow_html=True)
-        time.sleep(0.005)
-    placeholder.markdown(f'<div class="summary-container">{full_response}</div>', unsafe_allow_html=True)
+        placeholder.markdown(f'<div class="glass-panel">{full_response}▌</div>', unsafe_allow_html=True)
+        time.sleep(0.003)
+    placeholder.markdown(f'<div class="glass-panel">{full_response}</div>', unsafe_allow_html=True)
 
 def main():
     if 'page' not in st.session_state: st.session_state.page = "home"
     if 'current_text' not in st.session_state: st.session_state.current_text = None
     if 'current_title' not in st.session_state: st.session_state.current_title = ""
-    
+    if 'active_tool' not in st.session_state: st.session_state.active_tool = None
+
     client = GeminiClient()
     db = Database()
+    
     st.markdown('<div class="main-wrapper">', unsafe_allow_html=True)
 
-    # --- HOME PAGE ---
+    # --- HOME: インプットとライブラリへの導線 ---
     if st.session_state.page == "home":
-        st.markdown('<div style="text-align:center; padding: 30px 0;"><h1 style="font-family:\'Exo 2\'; font-size:3rem; margin:0; background: linear-gradient(to right, #00f2fe, #fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">DEEP LEARN</h1></div>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; font-family:\'Exo 2\'; font-size:2.5rem; margin-bottom:1.5rem;">💎</h1>', unsafe_allow_html=True)
         
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🚀 新しく学習する"):
-                st.session_state.input_mode = True
-        with col2:
-            if st.button("📂 ライブラリを見る"):
-                st.session_state.page = "library"
+        # インプットエリア
+        st.markdown("""
+        <div style="background:rgba(255,255,255,0.02); padding:20px; border-radius:24px; border:1px solid rgba(255,255,255,0.05); margin-bottom:2rem;">
+            <p style="text-align:center; color:#889; margin-bottom:15px;">学習を開始するソースを入力</p>
+        """, unsafe_allow_html=True)
+        url = st.text_input("URL", label_visibility="collapsed", placeholder="YouTube URLをペースト...")
+        
+        if st.button("🚀 解析をはじめる"):
+            if url:
+                with st.status("🧠 思考を同期中...", expanded=False):
+                    res = YouTubeHandler().get_transcript_from_url(url)
+                    st.session_state.current_text = res['text']
+                    st.session_state.current_title = "新規学習セッション"
+                st.session_state.page = "study"
                 st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        if st.session_state.get('input_mode'):
-            st.markdown("---")
-            url = st.text_input("YouTube URL", placeholder="https://youtube.com/...")
-            if st.button("🎬 動画を解析"):
-                if url:
-                    with st.status("🧠 AI同期中..."):
-                        res = YouTubeHandler().get_transcript_from_url(url)
-                        st.session_state.current_text = res['text']
-                        st.session_state.current_title = "YouTube Content"
-                    st.session_state.page = "study"
-                    st.rerun()
-
-    # --- STUDY PAGE ---
-    elif st.session_state.page == "study":
-        st.markdown(f'<h3 style="text-align:center;">📖 {st.session_state.current_title}</h3>', unsafe_allow_html=True)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🏠 Home"):
-                st.session_state.page = "home"
-                st.rerun()
-        with col2:
-            if st.button("💾 この学習を保存"):
-                db.save_knowledge(st.session_state.current_title, st.session_state.current_text)
-                st.toast("ライブラリに保存しました！", icon="✅")
-
-        tab1, tab2, tab3 = st.tabs(["✨ 要約", "🎯 ポイント", "❓ クイズ"])
-        
-        with tab1:
-            if st.button("⚡ 5分で読破する要約"):
-                res = client.summarize(st.session_state.current_text, '30min')
-                type_summary(res)
-        
-        with tab2:
-            if st.button("⚡ 重要語句を抽出"):
-                res = client.extract_key_points(st.session_state.current_text)
-                type_summary(res)
-        
-        with tab3:
-            if st.button("⚡ クイズを生成"):
-                with st.spinner("思考中..."):
-                    quiz_data = client.generate_quiz(st.session_state.current_text)
-                    st.session_state.last_quiz = quiz_data
-            if 'last_quiz' in st.session_state:
-                st.markdown(f'<div class="summary-container">{st.session_state.last_quiz}</div>', unsafe_allow_html=True)
-                with st.expander("👁️ 正解・解説を確認する"):
-                    st.info("回答は上記テキスト内に含まれています。")
-
-    # --- LIBRARY PAGE (振り返り) ---
-    elif st.session_state.page == "library":
-        st.markdown('<h2 style="text-align:center;">📂 ライブラリ</h2>', unsafe_allow_html=True)
-        if st.button("🏠 Homeへ戻る"):
-            st.session_state.page = "home"
-            st.rerun()
-        
+        st.markdown("### 📂 続きから学ぶ")
         items = db.get_all_knowledge()
         if not items:
-            st.info("まだ保存されたナレッジがありません。")
-        
-        for item in items:
-            with st.container():
-                st.markdown(f"""
-                <div class="kb-card">
-                    <small style="color:#00f2fe;">{item['created_at']}</small>
-                    <h4 style="margin:5px 0;">{item['title']}</h4>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                c1, c2 = st.columns(2)
-                if c1.button("🧠 復習する", key=f"rev_{item['id']}"):
+            st.markdown('<p style="color:#556; font-size:0.9rem;">保存されたナレッジはありません</p>', unsafe_allow_html=True)
+        else:
+            for item in items[:3]: # 直近3つ表示
+                if st.button(f"📖 {item['title'][:20]}...", key=item['id']):
                     st.session_state.current_text = item['original_text']
                     st.session_state.current_title = item['title']
                     st.session_state.page = "study"
                     st.rerun()
-                if c2.button("🗑️ 削除", key=f"del_{item['id']}"):
+        
+        if st.button("すべてのライブラリを表示 →", type="secondary"):
+            st.session_state.page = "library"
+            st.rerun()
+
+    # --- STUDY: 直感的なツール選択 ---
+    elif st.session_state.page == "study":
+        st.markdown(f'<p style="color:#00f2fe; font-weight:600; text-align:center; margin:0;">STUDY SESSION</p>', unsafe_allow_html=True)
+        st.markdown(f'<h2 style="text-align:center; margin-top:5px; font-size:1.5rem;">{st.session_state.current_title}</h2>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ 戻る"):
+                st.session_state.page = "home"
+                st.session_state.active_tool = None
+                st.rerun()
+        with col2:
+            if st.button("💾 保存"):
+                db.save_knowledge(st.session_state.current_title, st.session_state.current_text)
+                st.toast("ライブラリに保存しました！")
+
+        st.markdown("---")
+
+        # ツール選択タイル
+        if not st.session_state.active_tool:
+            if st.button("⚡ 5分でわかる要約"):
+                st.session_state.active_tool = "summarize"
+                st.rerun()
+            if st.button("🎯 重要キーポイント"):
+                st.session_state.active_tool = "points"
+                st.rerun()
+            if st.button("❓ 理解度テスト"):
+                st.session_state.active_tool = "quiz"
+                st.rerun()
+        
+        # ツール実行結果
+        if st.session_state.active_tool == "summarize":
+            res = client.summarize(st.session_state.current_text, '30min')
+            type_display(res, "Quick Summary")
+            if st.button("🔄 他のツールを使う"):
+                st.session_state.active_tool = None
+                st.rerun()
+
+        elif st.session_state.active_tool == "points":
+            res = client.extract_key_points(st.session_state.current_text)
+            type_display(res, "Key Insights")
+            if st.button("🔄 他のツールを使う"):
+                st.session_state.active_tool = None
+                st.rerun()
+
+        elif st.session_state.active_tool == "quiz":
+            with st.spinner("クイズを生成中..."):
+                res = client.generate_quiz(st.session_state.current_text)
+            st.markdown("### ❓ Challenge")
+            st.markdown(f'<div class="quiz-box">{res}</div>', unsafe_allow_html=True)
+            with st.expander("👁️ 正解を表示"):
+                st.write("解説を確認して知識を定着させましょう。")
+            if st.button("🔄 他のツールを使う"):
+                st.session_state.active_tool = None
+                st.rerun()
+
+    # --- LIBRARY ---
+    elif st.session_state.page == "library":
+        st.markdown('<h2>📂 Library</h2>', unsafe_allow_html=True)
+        if st.button("🏠 ホームへ戻る"):
+            st.session_state.page = "home"
+            st.rerun()
+        
+        for item in db.get_all_knowledge():
+            with st.container():
+                st.markdown(f"""
+                <div class="action-card">
+                    <small style="color:#889;">{item['created_at']}</small>
+                    <h3>📖 {item['title']}</h3>
+                </div>
+                """, unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                if c1.button("学習する", key=f"l_{item['id']}"):
+                    st.session_state.current_text = item['original_text']
+                    st.session_state.current_title = item['title']
+                    st.session_state.page = "study"
+                    st.rerun()
+                if c2.button("削除", key=f"d_{item['id']}"):
                     db.delete_knowledge(item['id'])
                     st.rerun()
 
