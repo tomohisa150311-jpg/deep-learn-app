@@ -15,13 +15,22 @@ st.set_page_config(
 )
 
 # モダンなカスタムCSS
+# --- 修正前（エラーの原因） ---
+# 直接 background: ... と書いているはずです
+
+# --- 修正後 ---
 st.markdown("""
-    /* ↓ここにスマホ用を追記！ */
+    <style>
+    .main {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    /* ここにスマホ最適化のコードも一緒に入れちゃいましょう */
     @media (max-width: 640px) {
         .hero-title { font-size: 2.2rem !important; }
-        .stButton>button { width: 100% !important; }
-        /* ...などなど */
+        .stButton>button { width: 100% !important; height: 3.5rem !important; }
     }
+    </style>
+""", unsafe_allow_html=True)
     </style>
 """, unsafe_allow_html=True)<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
